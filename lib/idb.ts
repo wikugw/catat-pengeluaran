@@ -1,10 +1,11 @@
 import { Pengeluaran, PengeluaranInsert } from './supabase'
 
 const DB_NAME = 'catat-pengeluaran'
-const DB_VERSION = 1
+const DB_VERSION = 2
 const STORE_PENGELUARAN = 'pengeluaran'
 const STORE_JENIS = 'jenis_pengeluaran'
 const STORE_QUEUE = 'sync_queue'
+const STORE_BUDGETS = 'budgets'
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -18,13 +19,14 @@ function openDB(): Promise<IDBDatabase> {
         store.createIndex('created_at', 'created_at', { unique: false })
         store.createIndex('created_by', 'created_by', { unique: false })
       }
-
       if (!db.objectStoreNames.contains(STORE_JENIS)) {
         db.createObjectStore(STORE_JENIS, { keyPath: 'id' })
       }
-
       if (!db.objectStoreNames.contains(STORE_QUEUE)) {
         db.createObjectStore(STORE_QUEUE, { keyPath: 'id' })
+      }
+      if (!db.objectStoreNames.contains(STORE_BUDGETS)) {
+        db.createObjectStore(STORE_BUDGETS, { keyPath: 'jenis_nama' })
       }
     }
 
@@ -67,20 +69,57 @@ export async function savePengeluaranOffline(item: Pengeluaran) {
   })
 }
 
-export async function getPengeluaranBulanIni(): Promise<Pengeluaran[]> {
+export async function deletePengeluaranOffline(id: string) {
   const db = await openDB()
-  const now = new Date()
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString()
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE_PENGELUARAN, 'readwrite')
+    const store = tx.objectStore(STORE_PENGELUARAN)
+    const req = store.get(id)
+    req.onsuccess = () => {
+      const item = req.result
+      if (item) {
+        item.deleted_at = new Date().toISOString()
+        store.put(item)
+      }
+    }
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
+export async function updatePengeluaranOffline(id: string, fields: Partial<Pengeluaran>) {
+  const db = await openDB()
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE_PENGELUARAN, 'readwrite')
+    const store = tx.objectStore(STORE_PENGELUARAN)
+    const req = store.get(id)
+    req.onsuccess = () => {
+      const item = req.result
+      if (item) store.put({ ...item, ...fields })
+    }
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
+export async function getPengeluaran(year: number, month: number): Promise<Pengeluaran[]> {
+  const db = await openDB()
+  const start = new Date(year, month, 1).toISOString()
+  const end = new Date(year, month + 1, 0, 23, 59, 59).toISOString()
 
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_PENGELUARAN, 'readonly')
     const index = tx.objectStore(STORE_PENGELUARAN).index('created_at')
-    const range = IDBKeyRange.bound(startOfMonth, endOfMonth)
+    const range = IDBKeyRange.bound(start, end)
     const req = index.getAll(range)
-    req.onsuccess = () => resolve(req.result)
+    req.onsuccess = () => resolve((req.result as Pengeluaran[]).filter(p => !p.deleted_at))
     req.onerror = () => reject(req.error)
   })
+}
+
+export async function getPengeluaranBulanIni(): Promise<Pengeluaran[]> {
+  const now = new Date()
+  return getPengeluaran(now.getFullYear(), now.getMonth())
 }
 
 export async function getSyncQueue(): Promise<{ id: string; data: PengeluaranInsert }[]> {
@@ -118,5 +157,25 @@ export async function markSynced(id: string) {
     }
     tx.oncomplete = () => resolve()
     tx.onerror = () => reject(tx.error)
+  })
+}
+
+export async function saveBudgetsOffline(budgets: { jenis_nama: string; monthly_limit: number }[]) {
+  const db = await openDB()
+  const tx = db.transaction(STORE_BUDGETS, 'readwrite')
+  for (const b of budgets) tx.objectStore(STORE_BUDGETS).put(b)
+  return new Promise<void>((res, rej) => {
+    tx.oncomplete = () => res()
+    tx.onerror = () => rej(tx.error)
+  })
+}
+
+export async function getBudgetsOffline(): Promise<{ jenis_nama: string; monthly_limit: number }[]> {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_BUDGETS, 'readonly')
+    const req = tx.objectStore(STORE_BUDGETS).getAll()
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error)
   })
 }
