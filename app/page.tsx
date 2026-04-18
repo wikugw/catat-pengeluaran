@@ -1,65 +1,123 @@
-import Image from "next/image";
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import InputForm from './components/InputForm'
+import Dashboard from './components/Dashboard'
+import PengeluaranTable from './components/PengeluaranTable'
+import { Pengeluaran } from '@/lib/supabase'
+import { fetchPengeluaranBulanIni, syncQueue } from '@/lib/sync'
+import { getPengeluaranBulanIni } from '@/lib/idb'
+
+type Tab = 'input' | 'dashboard' | 'riwayat'
 
 export default function Home() {
+  const [tab, setTab] = useState<Tab>('input')
+  const [data, setData] = useState<Pengeluaran[]>([])
+  const [loading, setLoading] = useState(true)
+  const [isOnline, setIsOnline] = useState(true)
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      // Try remote first
+      const remote = await fetchPengeluaranBulanIni()
+      if (remote) {
+        setData(remote as Pengeluaran[])
+      } else {
+        throw new Error('offline')
+      }
+    } catch {
+      // Fall back to local
+      const local = await getPengeluaranBulanIni()
+      setData(local)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadData()
+
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(console.error)
+    }
+
+    // Online/offline listeners
+    const handleOnline = async () => {
+      setIsOnline(true)
+      await syncQueue()
+      loadData()
+    }
+    const handleOffline = () => setIsOnline(false)
+
+    setIsOnline(navigator.onLine)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [loadData])
+
+  function handleSuccess() {
+    setTab('dashboard')
+    loadData()
+  }
+
+  const tabs: { id: Tab; label: string; icon: string }[] = [
+    { id: 'input', label: 'Catat', icon: '✏️' },
+    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+    { id: 'riwayat', label: 'Riwayat', icon: '📋' },
+  ]
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen bg-slate-900 text-white flex flex-col">
+      {/* Header */}
+      <header className="px-4 pt-safe pt-6 pb-4 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-black text-white">💸 CatatDuit</h1>
+          <p className="text-xs text-slate-400">Pengeluaran Rumah Tangga</p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
+          isOnline
+            ? 'bg-emerald-900/40 border-emerald-700/50 text-emerald-400'
+            : 'bg-amber-900/40 border-amber-700/50 text-amber-400'
+        }`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+          {isOnline ? 'Online' : 'Offline'}
         </div>
+      </header>
+
+      {/* Content */}
+      <main className="flex-1 px-4 pb-28 overflow-y-auto">
+        {tab === 'input' && (
+          <div className="rounded-2xl bg-slate-800/50 border border-slate-700 p-5">
+            <InputForm onSuccess={handleSuccess} />
+          </div>
+        )}
+        {tab === 'dashboard' && <Dashboard data={data} loading={loading} />}
+        {tab === 'riwayat' && <PengeluaranTable data={data} loading={loading} />}
       </main>
+
+      {/* Bottom nav */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur border-t border-slate-800 pb-safe">
+        <div className="flex">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex-1 flex flex-col items-center gap-0.5 py-3 text-xs font-semibold transition-colors ${
+                tab === t.id ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              <span className="text-xl">{t.icon}</span>
+              {t.label}
+              {tab === t.id && <span className="w-1 h-1 rounded-full bg-indigo-400 mt-0.5" />}
+            </button>
+          ))}
+        </div>
+      </nav>
     </div>
-  );
+  )
 }
