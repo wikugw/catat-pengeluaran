@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "./components/ThemeProvider";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 
@@ -25,11 +26,21 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="id" className={`${geist.variable} h-full`}>
+    <html lang="id" className={`${geist.variable} h-full`} suppressHydrationWarning>
       <head>
         <link rel="apple-touch-icon" href="/icon-192.png" />
+        {/* Prevent flash of wrong theme */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){
+            var t = localStorage.getItem('theme');
+            var p = t || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            if (p === 'dark') document.documentElement.classList.add('dark');
+          })();
+        `}} />
       </head>
-      <body className="h-full font-sans antialiased">{children}</body>
+      <body className="h-full font-sans antialiased">
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
     </html>
   );
 }

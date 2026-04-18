@@ -7,15 +7,16 @@ import PengeluaranTable from './components/PengeluaranTable'
 import AchievementsPanel from './components/AchievementsPanel'
 import BudgetModal from './components/BudgetModal'
 import ToastContainer, { useToast } from './components/Toast'
+import { useTheme } from './components/ThemeProvider'
 import { Pengeluaran, Budget, JenisPengeluaran, getLevelFromXp } from '@/lib/supabase'
 import { fetchPengeluaran, syncQueue, fetchBudgets } from '@/lib/sync'
-import { getPengeluaran, saveBudgetsOffline, getBudgetsOffline, getJenisOffline } from '@/lib/idb'
+import { getPengeluaran, saveBudgetsOffline, getBudgetsOffline, getJenisOffline, saveJenisOffline } from '@/lib/idb'
 import { supabase } from '@/lib/supabase'
-import { saveJenisOffline } from '@/lib/idb'
 
 type Tab = 'input' | 'dashboard' | 'riwayat' | 'achievements'
 
 export default function Home() {
+  const { theme, toggle: toggleTheme } = useTheme()
   const [tab, setTab] = useState<Tab>('input')
   const [data, setData] = useState<Pengeluaran[]>([])
   const [budgets, setBudgets] = useState<Budget[]>([])
@@ -26,123 +27,78 @@ export default function Home() {
   const [xp, setXp] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
 
-  // Month navigation
   const now = new Date()
   const [viewYear, setViewYear] = useState(now.getFullYear())
   const [viewMonth, setViewMonth] = useState(now.getMonth())
+  const isCurrentMonth = viewYear === now.getFullYear() && viewMonth === now.getMonth()
 
   const { toasts, show: showToast, dismiss } = useToast()
-
-  const isCurrentMonth = viewYear === now.getFullYear() && viewMonth === now.getMonth()
 
   const loadData = useCallback(async (year = viewYear, month = viewMonth) => {
     setLoading(true)
     try {
       const remote = await fetchPengeluaran(year, month)
-      if (remote) {
-        setData(remote as Pengeluaran[])
-      } else {
-        throw new Error('offline')
-      }
+      if (remote) { setData(remote as Pengeluaran[]) }
+      else throw new Error('offline')
     } catch {
-      const local = await getPengeluaran(year, month)
-      setData(local)
-    } finally {
-      setLoading(false)
-    }
+      setData(await getPengeluaran(year, month))
+    } finally { setLoading(false) }
   }, [viewYear, viewMonth])
 
   const loadBudgets = useCallback(async () => {
     try {
       const remote = await fetchBudgets()
-      if (remote) {
-        setBudgets(remote as Budget[])
-        await saveBudgetsOffline(remote as Budget[])
-      } else {
-        throw new Error('offline')
-      }
-    } catch {
-      const local = await getBudgetsOffline()
-      setBudgets(local)
-    }
+      if (remote) { setBudgets(remote as Budget[]); await saveBudgetsOffline(remote as Budget[]) }
+      else throw new Error('offline')
+    } catch { setBudgets(await getBudgetsOffline()) }
   }, [])
 
   const loadJenis = useCallback(async () => {
     try {
       const { data: remote, error } = await supabase.from('jenis_pengeluaran').select('*').order('nama')
-      if (remote && !error) {
-        setJenisList(remote)
-        await saveJenisOffline(remote)
-      } else throw new Error('offline')
-    } catch {
-      const local = await getJenisOffline()
-      setJenisList(local)
-    }
+      if (remote && !error) { setJenisList(remote); await saveJenisOffline(remote) }
+      else throw new Error('offline')
+    } catch { setJenisList(await getJenisOffline()) }
   }, [])
 
   useEffect(() => {
-    const savedXp = parseInt(localStorage.getItem('input-streak') || '0') * 10
-    setXp(savedXp)
-
-    loadData()
-    loadBudgets()
-    loadJenis()
-
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(console.error)
-    }
+    setXp(parseInt(localStorage.getItem('input-streak') || '0') * 10)
+    loadData(); loadBudgets(); loadJenis()
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(console.error)
 
     const handleOnline = async () => {
       setIsOnline(true)
       showToast('Kembali online — sync data...', 'info', 2000)
-      await syncQueue()
-      loadData()
+      await syncQueue(); loadData()
       showToast('✅ Data tersinkron!', 'success')
     }
-    const handleOffline = () => {
-      setIsOnline(false)
-      showToast('Kamu offline — data tersimpan lokal', 'offline')
-    }
+    const handleOffline = () => { setIsOnline(false); showToast('Kamu offline — data tersimpan lokal', 'offline') }
 
     setIsOnline(navigator.onLine)
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
-    return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
-    }
+    return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline) }
   }, []) // eslint-disable-line
 
-  // Reload when month changes
-  useEffect(() => {
-    loadData(viewYear, viewMonth)
-  }, [viewYear, viewMonth]) // eslint-disable-line
+  useEffect(() => { loadData(viewYear, viewMonth) }, [viewYear, viewMonth]) // eslint-disable-line
 
   function handleSuccess() {
-    const newXp = xp + 10
-    setXp(newXp)
+    const newXp = xp + 10; setXp(newXp)
     showToast(isOnline ? '✅ Tersimpan & tersinkron!' : '📵 Tersimpan offline', isOnline ? 'success' : 'offline')
-    setTab('dashboard')
-    loadData()
+    setTab('dashboard'); loadData()
   }
 
-  async function handlePullRefresh() {
-    setRefreshing(true)
-    await loadData(viewYear, viewMonth)
-    await loadBudgets()
-    setRefreshing(false)
-    showToast('Data diperbarui', 'info', 1500)
+  async function handleRefresh() {
+    setRefreshing(true); await loadData(viewYear, viewMonth); await loadBudgets()
+    setRefreshing(false); showToast('Data diperbarui', 'info', 1500)
   }
 
   function prevMonth() {
-    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11) }
-    else setViewMonth(m => m - 1)
+    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11) } else setViewMonth(m => m - 1)
   }
-
   function nextMonth() {
     if (isCurrentMonth) return
-    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0) }
-    else setViewMonth(m => m + 1)
+    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0) } else setViewMonth(m => m + 1)
   }
 
   const level = getLevelFromXp(xp)
@@ -156,60 +112,62 @@ export default function Home() {
   ]
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white flex flex-col">
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
       <ToastContainer toasts={toasts} onDismiss={dismiss} />
 
       {showBudget && (
-        <BudgetModal
-          jenisList={jenisList}
-          onClose={() => { setShowBudget(false); loadBudgets() }}
-        />
+        <BudgetModal jenisList={jenisList} onClose={() => { setShowBudget(false); loadBudgets() }} />
       )}
 
       {/* Header */}
       <header className="px-4 pt-safe pt-6 pb-3 mt-4 flex items-center justify-between shrink-0">
         <div>
-          <h1 className="text-xl font-black text-white">💸 CatatDuit</h1>
-          <p className="text-xs text-slate-400">Pengeluaran Rumah Tangga</p>
+          <h1 className="text-xl font-black">💸 CatatDuit</h1>
+          <p className="text-xs" style={{ color: 'var(--text-2)' }}>Pengeluaran Rumah Tangga</p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Level badge */}
-          <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-yellow-900/30 border border-yellow-700/40 text-xs font-bold text-yellow-400">
+          {/* Theme toggle */}
+          <button
+            onClick={toggleTheme}
+            className="p-2 rounded-full border text-sm transition-colors"
+            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-2)' }}
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
+          {/* Level */}
+          <div className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700/40">
             {level.icon} Lv.{level.level}
           </div>
-          {/* Online badge */}
+          {/* Online */}
           <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
             isOnline
-              ? 'bg-emerald-900/40 border-emerald-700/50 text-emerald-400'
-              : 'bg-amber-900/40 border-amber-700/50 text-amber-400'
+              ? 'bg-emerald-50 dark:bg-emerald-900/40 border-emerald-200 dark:border-emerald-700/50 text-emerald-600 dark:text-emerald-400'
+              : 'bg-amber-50 dark:bg-amber-900/40 border-amber-200 dark:border-amber-700/50 text-amber-600 dark:text-amber-400'
           }`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+            <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-amber-500'}`} />
             {isOnline ? 'Online' : 'Offline'}
           </div>
         </div>
       </header>
 
-      {/* Month navigator (shown on dashboard/riwayat) */}
+      {/* Month nav */}
       {(tab === 'dashboard' || tab === 'riwayat') && (
         <div className="flex items-center justify-between px-4 pb-3 shrink-0">
-          <button onClick={prevMonth} className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors">
+          <button onClick={prevMonth}
+            className="p-2 rounded-xl border text-sm font-bold transition-colors"
+            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-2)' }}>
             ‹
           </button>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-white">{monthLabel}</span>
-            <button
-              onClick={handlePullRefresh}
-              disabled={refreshing}
-              className="text-xs text-slate-500 hover:text-indigo-400 transition-colors"
-            >
+            <span className="text-sm font-bold">{monthLabel}</span>
+            <button onClick={handleRefresh} disabled={refreshing}
+              className="text-xs transition-colors text-indigo-500 dark:text-indigo-400">
               {refreshing ? '⏳' : '↻'}
             </button>
           </div>
-          <button
-            onClick={nextMonth}
-            disabled={isCurrentMonth}
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30 transition-colors"
-          >
+          <button onClick={nextMonth} disabled={isCurrentMonth}
+            className="p-2 rounded-xl border text-sm font-bold transition-colors disabled:opacity-30"
+            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-2)' }}>
             ›
           </button>
         </div>
@@ -218,47 +176,32 @@ export default function Home() {
       {/* Content */}
       <main className="flex-1 px-4 pb-28 overflow-y-auto">
         {tab === 'input' && (
-          <div className="rounded-2xl bg-slate-800/50 border border-slate-700 p-5">
+          <div className="rounded-2xl border p-5" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
             <InputForm onSuccess={handleSuccess} />
           </div>
         )}
         {tab === 'dashboard' && (
-          <Dashboard
-            data={data}
-            budgets={budgets}
-            loading={loading}
-            year={viewYear}
-            month={viewMonth}
-            onOpenBudget={() => setShowBudget(true)}
-          />
+          <Dashboard data={data} budgets={budgets} loading={loading} year={viewYear} month={viewMonth} onOpenBudget={() => setShowBudget(true)} />
         )}
         {tab === 'riwayat' && (
-          <PengeluaranTable
-            data={data}
-            jenisList={jenisList}
-            loading={loading}
-            onRefresh={() => loadData(viewYear, viewMonth)}
-          />
+          <PengeluaranTable data={data} jenisList={jenisList} loading={loading} onRefresh={() => loadData(viewYear, viewMonth)} />
         )}
-        {tab === 'achievements' && (
-          <AchievementsPanel xp={xp} data={data} />
-        )}
+        {tab === 'achievements' && <AchievementsPanel xp={xp} data={data} />}
       </main>
 
       {/* Bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur border-t border-slate-800 pb-safe">
+      <nav className="fixed bottom-0 left-0 right-0 backdrop-blur border-t pb-safe"
+        style={{ background: 'var(--nav-bg)', borderColor: 'var(--nav-border)' }}>
         <div className="flex">
           {tabs.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
+            <button key={t.id} onClick={() => setTab(t.id)}
               className={`flex-1 flex flex-col items-center gap-0.5 py-3 text-xs font-semibold transition-colors ${
-                tab === t.id ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'
+                tab === t.id ? 'text-indigo-600 dark:text-indigo-400' : ''
               }`}
-            >
+              style={tab !== t.id ? { color: 'var(--text-3)' } : {}}>
               <span className="text-xl">{t.icon}</span>
               {t.label}
-              {tab === t.id && <span className="w-1 h-1 rounded-full bg-indigo-400 mt-0.5" />}
+              {tab === t.id && <span className="w-1 h-1 rounded-full bg-indigo-600 dark:bg-indigo-400 mt-0.5" />}
             </button>
           ))}
         </div>

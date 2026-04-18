@@ -1,37 +1,57 @@
 @import "tailwindcss";
 
+/* ── Theme tokens ── */
 :root {
-  --background: #0f172a;
-  --foreground: #f8fafc;
+  --bg:           #f1f5f9;
+  --bg-card:      #ffffff;
+  --bg-card2:     #f8fafc;
+  --bg-input:     #f1f5f9;
+  --border:       #e2e8f0;
+  --border-focus: #6366f1;
+  --text:         #0f172a;
+  --text-2:       #475569;
+  --text-3:       #94a3b8;
+  --nav-bg:       rgba(248,250,252,0.95);
+  --nav-border:   #e2e8f0;
+}
+
+.dark {
+  --bg:           #0f172a;
+  --bg-card:      #1e293b;
+  --bg-card2:     #0f172a;
+  --bg-input:     #1e293b;
+  --border:       #334155;
+  --border-focus: #6366f1;
+  --text:         #f8fafc;
+  --text-2:       #94a3b8;
+  --text-3:       #475569;
+  --nav-bg:       rgba(15,23,42,0.95);
+  --nav-border:   #1e293b;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background-color: var(--bg);
+  color: var(--text);
+  transition: background-color 0.2s, color 0.2s;
 }
 
-/* Safe area for PWA */
-.pt-safe {
-  padding-top: env(safe-area-inset-top);
-}
-.pb-safe {
-  padding-bottom: env(safe-area-inset-bottom);
-}
+/* Safe areas */
+.pt-safe { padding-top: env(safe-area-inset-top); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
 
-/* Hide scrollbar */
-.scrollbar-none::-webkit-scrollbar {
-  display: none;
-}
-.scrollbar-none {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
+/* Scrollbar */
+.scrollbar-none::-webkit-scrollbar { display: none; }
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* Toast fade in */
+/* Toast */
 @keyframes fade-in {
   from { opacity: 0; transform: translateY(-8px) scale(0.95); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
 }
-.animate-fade-in {
-  animation: fade-in 0.2s ease-out forwards;
+.animate-fade-in { animation: fade-in 0.2s ease-out forwards; }
+
+/* Swipe-to-delete */
+@keyframes slide-out-left {
+  to { transform: translateX(-100%); opacity: 0; }
 }
+.slide-out { animation: slide-out-left 0.25s ease-in forwards; }
