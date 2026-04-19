@@ -170,6 +170,16 @@ export async function saveBudgetsOffline(budgets: { jenis_nama: string; monthly_
   })
 }
 
+export async function deleteBudgetOffline(jenis_nama: string) {
+  const db = await openDB()
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE_BUDGETS, 'readwrite')
+    tx.objectStore(STORE_BUDGETS).delete(jenis_nama)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
 export async function getBudgetsOffline(): Promise<{ jenis_nama: string; monthly_limit: number }[]> {
   const db = await openDB()
   return new Promise((resolve, reject) => {

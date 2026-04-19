@@ -66,6 +66,11 @@ export async function fetchBudgets() {
   return data
 }
 
+export async function deleteBudget(jenis_nama: string) {
+  const { error } = await supabase.from('budgets').delete().eq('jenis_nama', jenis_nama)
+  return !error
+}
+
 export async function upsertBudget(jenis_nama: string, monthly_limit: number) {
   const { error } = await supabase
     .from('budgets')

@@ -17,7 +17,7 @@ import { supabase } from '@/lib/supabase'
 type Tab = 'input' | 'dashboard' | 'riwayat' | 'achievements'
 
 export default function Home() {
-  const { theme, toggle: toggleTheme } = useTheme()
+  const { theme, cycle: cycleTheme } = useTheme()
   const [tab, setTab] = useState<Tab>('input')
   const [data, setData] = useState<Pengeluaran[]>([])
   const [budgets, setBudgets] = useState<Budget[]>([])
@@ -128,32 +128,27 @@ export default function Home() {
       )}
 
       {/* ── Header ── */}
-      <header className="px-5 pt-safe pb-3 mt-5 flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="text-2xl font-black">💸 CatatDuit</h1>
-          <p className="text-sm" style={{ color: 'var(--text-2)' }}>Pengeluaran Rumah Tangga</p>
-        </div>
+      <header className="px-5 pt-safe pb-2 mt-4 flex items-center justify-between shrink-0">
+        {/* Left: wordmark only */}
+        <h1 className="text-2xl font-black tracking-tight">💸 CatatDuit</h1>
+
+        {/* Right: minimal controls */}
         <div className="flex items-center gap-2">
-          {/* Theme toggle — 44px touch target */}
-          <button onClick={toggleTheme}
-            className="w-11 h-11 flex items-center justify-center rounded-full border text-xl transition-colors active:scale-95"
-            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            {theme === 'dark' ? '☀️' : '🌙'}
+          {/* Online dot — tiny, non-intrusive */}
+          <span className={`w-2 h-2 rounded-full shrink-0 ${isOnline ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+
+          {/* Level — icon + number only */}
+          <span className="text-sm font-bold" style={{ color: 'var(--text-2)' }}>
+            {level.icon} {level.level}
+          </span>
+
+          {/* Theme cycle: ☀️ → 🌙 → ⬛ → ☀️ */}
+          <button onClick={cycleTheme}
+            className="w-10 h-10 flex items-center justify-center rounded-full border text-lg transition-all active:scale-90"
+            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+            title={`Theme: ${theme} → ${theme === 'light' ? 'dark' : theme === 'dark' ? 'oled' : 'light'}`}>
+            {theme === 'light' ? '🌙' : theme === 'dark' ? '⬛' : '☀️'}
           </button>
-          {/* Level badge */}
-          <div className="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-bold border
-            text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-700/40">
-            {level.icon} Lv.{level.level}
-          </div>
-          {/* Online indicator */}
-          <div className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold border ${
-            isOnline
-              ? 'bg-emerald-50 dark:bg-emerald-900/40 border-emerald-200 dark:border-emerald-700/50 text-emerald-600 dark:text-emerald-400'
-              : 'bg-amber-50 dark:bg-amber-900/40 border-amber-200 dark:border-amber-700/50 text-amber-600 dark:text-amber-400'
-          }`}>
-            <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-            {isOnline ? 'Online' : 'Offline'}
-          </div>
         </div>
       </header>
 

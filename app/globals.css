@@ -11,22 +11,38 @@
   --text:         #0f172a;
   --text-2:       #475569;
   --text-3:       #94a3b8;
-  --nav-bg:       rgba(248,250,252,0.95);
+  --nav-bg:       rgba(248,250,252,0.97);
   --nav-border:   #e2e8f0;
 }
 
+/* Standard dark */
 .dark {
-  --bg:           #0f172a;
-  --bg-card:      #1e293b;
-  --bg-card2:     #0f172a;
-  --bg-input:     #1e293b;
-  --border:       #334155;
+  --bg:           #0a0a0a;
+  --bg-card:      #111111;
+  --bg-card2:     #0a0a0a;
+  --bg-input:     #181818;
+  --border:       #272727;
   --border-focus: #6366f1;
-  --text:         #f8fafc;
-  --text-2:       #94a3b8;
-  --text-3:       #475569;
-  --nav-bg:       rgba(15,23,42,0.95);
-  --nav-border:   #1e293b;
+  --text:         #f0f0f0;
+  --text-2:       #888888;
+  --text-3:       #444444;
+  --nav-bg:       rgba(10,10,10,0.98);
+  --nav-border:   #1a1a1a;
+}
+
+/* OLED pitch-black — toggled via .oled class on <html> */
+.oled {
+  --bg:           #000000;
+  --bg-card:      #0a0a0a;
+  --bg-card2:     #000000;
+  --bg-input:     #0f0f0f;
+  --border:       #1f1f1f;
+  --border-focus: #6366f1;
+  --text:         #f0f0f0;
+  --text-2:       #777777;
+  --text-3:       #383838;
+  --nav-bg:       rgba(0,0,0,0.99);
+  --nav-border:   #111111;
 }
 
 body {

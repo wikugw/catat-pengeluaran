@@ -35,6 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             var t = localStorage.getItem('theme');
             var p = t || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
             if (p === 'dark') document.documentElement.classList.add('dark');
+            if (p === 'oled') { document.documentElement.classList.add('dark'); document.documentElement.classList.add('oled'); }
           })();
         `}} />
       </head>
