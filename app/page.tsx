@@ -10,9 +10,9 @@ import BudgetModal from './components/BudgetModal'
 import ToastContainer, { useToast } from './components/Toast'
 import { useTheme } from './components/ThemeProvider'
 import { Pengeluaran, Budget, JenisPengeluaran, getLevelFromXp } from '@/lib/supabase'
-import { fetchPengeluaran, syncQueue, fetchBudgets } from '@/lib/sync'
-import { getPengeluaran, saveBudgetsOffline, getBudgetsOffline, getJenisOffline, saveJenisOffline } from '@/lib/idb'
-import { supabase } from '@/lib/supabase'
+import { fetchPengeluaran, syncQueue, fetchBudgets, fetchAllXp, upsertXp } from '@/lib/sync'
+import { getPengeluaran, saveBudgetsOffline, getBudgetsOffline, getJenisOffline, saveJenisOffline, saveXpOffline, getXpOffline, getAllXpOffline } from '@/lib/idb'
+import { loadJenisOfflineFirst } from '@/lib/jenis'
 
 type Tab = 'input' | 'dashboard' | 'riwayat' | 'achievements'
 
@@ -26,6 +26,7 @@ export default function Home() {
   const [isOnline, setIsOnline] = useState(true)
   const [showBudget, setShowBudget] = useState(false)
   const [xp, setXp] = useState(0)
+  const [allXp, setAllXp] = useState<Record<string, number>>({ wiku: 0, dita: 0 })
   const [refreshing, setRefreshing] = useState(false)
 
   const [inputMode, setInputMode] = useState<'single' | 'batch'>('single')
@@ -56,22 +57,42 @@ export default function Home() {
   }, [])
 
   const loadJenis = useCallback(async () => {
+    loadJenisOfflineFirst(setJenisList)
+  }, [])
+
+  const loadXp = useCallback(async () => {
+    // 1. Load from IDB immediately
+    const cached = await getAllXpOffline()
+    if (cached.length > 0) {
+      const map: Record<string, number> = { wiku: 0, dita: 0 }
+      for (const r of cached) map[r.user_name] = r.xp
+      setAllXp(map)
+      // Show current user's XP (we don't know who is "current" globally, show max)
+      setXp(Math.max(...Object.values(map)))
+    }
+    // 2. Fetch from Supabase in background
     try {
-      const { data: remote, error } = await supabase.from('jenis_pengeluaran').select('*').order('nama')
-      if (remote && !error) { setJenisList(remote); await saveJenisOffline(remote) }
-      else throw new Error()
-    } catch { setJenisList(await getJenisOffline()) }
+      const remote = await fetchAllXp()
+      if (remote && remote.length > 0) {
+        const map: Record<string, number> = { wiku: 0, dita: 0 }
+        for (const r of remote) {
+          map[r.user_name] = r.xp
+          await saveXpOffline(r.user_name, r.xp)
+        }
+        setAllXp(map)
+        setXp(Math.max(...Object.values(map)))
+      }
+    } catch { /* use cached */ }
   }, [])
 
   useEffect(() => {
-    setXp(parseInt(localStorage.getItem('input-streak') || '0') * 10)
-    loadData(); loadBudgets(); loadJenis()
+    loadData(); loadBudgets(); loadJenis(); loadXp()
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(console.error)
 
     const handleOnline = async () => {
       setIsOnline(true)
       showToast('Kembali online — sync data...', 'info', 2000)
-      await syncQueue(); loadData()
+      await syncQueue(); loadData(); loadXp()
       showToast('✅ Data tersinkron!', 'success')
     }
     const handleOffline = () => { setIsOnline(false); showToast('Kamu offline — data tersimpan lokal', 'offline') }
@@ -85,15 +106,13 @@ export default function Home() {
   useEffect(() => { loadData(viewYear, viewMonth) }, [viewYear, viewMonth]) // eslint-disable-line
 
   function handleSuccess() {
-    const newXp = xp + 10; setXp(newXp)
     showToast(isOnline ? '✅ Tersimpan & tersinkron!' : '📵 Tersimpan offline', isOnline ? 'success' : 'offline')
-    setTab('dashboard'); loadData()
+    setTab('dashboard'); loadData(); loadXp()
   }
 
   function handleBatchSuccess(count: number) {
-    const newXp = xp + (count * 10); setXp(newXp)
     showToast(isOnline ? `✅ ${count} item tersimpan!` : `📵 ${count} item tersimpan offline`, isOnline ? 'success' : 'offline')
-    setTab('dashboard'); loadData()
+    setTab('dashboard'); loadData(); loadXp()
   }
 
   async function handleRefresh() {
@@ -216,7 +235,7 @@ export default function Home() {
           <PengeluaranTable data={data} jenisList={jenisList} loading={loading}
             onRefresh={() => loadData(viewYear, viewMonth)} />
         )}
-        {tab === 'achievements' && <AchievementsPanel xp={xp} data={data} />}
+        {tab === 'achievements' && <AchievementsPanel xp={xp} allXp={allXp} data={data} />}
       </main>
 
       {/* ── Bottom nav ── min 56px height, proper touch targets ── */}

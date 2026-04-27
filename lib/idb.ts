@@ -1,11 +1,12 @@
 import { Pengeluaran, PengeluaranInsert } from './supabase'
 
 const DB_NAME = 'catat-pengeluaran'
-const DB_VERSION = 2
+const DB_VERSION = 3
 const STORE_PENGELUARAN = 'pengeluaran'
 const STORE_JENIS = 'jenis_pengeluaran'
 const STORE_QUEUE = 'sync_queue'
 const STORE_BUDGETS = 'budgets'
+const STORE_XP = 'user_xp'
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -27,6 +28,9 @@ function openDB(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORE_BUDGETS)) {
         db.createObjectStore(STORE_BUDGETS, { keyPath: 'jenis_nama' })
+      }
+      if (!db.objectStoreNames.contains(STORE_XP)) {
+        db.createObjectStore(STORE_XP, { keyPath: 'user_name' })
       }
     }
 
@@ -185,6 +189,37 @@ export async function getBudgetsOffline(): Promise<{ jenis_nama: string; monthly
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_BUDGETS, 'readonly')
     const req = tx.objectStore(STORE_BUDGETS).getAll()
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error)
+  })
+}
+
+// ── XP ──────────────────────────────────────────────────────────────
+export async function saveXpOffline(user_name: string, xp: number) {
+  const db = await openDB()
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE_XP, 'readwrite')
+    tx.objectStore(STORE_XP).put({ user_name, xp })
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
+export async function getXpOffline(user_name: string): Promise<number> {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_XP, 'readonly')
+    const req = tx.objectStore(STORE_XP).get(user_name)
+    req.onsuccess = () => resolve(req.result?.xp ?? 0)
+    req.onerror = () => reject(req.error)
+  })
+}
+
+export async function getAllXpOffline(): Promise<{ user_name: string; xp: number }[]> {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_XP, 'readonly')
+    const req = tx.objectStore(STORE_XP).getAll()
     req.onsuccess = () => resolve(req.result)
     req.onerror = () => reject(req.error)
   })

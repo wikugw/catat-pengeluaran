@@ -3,8 +3,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { JenisPengeluaran } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
-import { saveJenisOffline, getJenisOffline, savePengeluaranOffline } from '@/lib/idb'
-import { syncQueue } from '@/lib/sync'
+import { saveJenisOffline, getJenisOffline, savePengeluaranOffline, saveXpOffline, getXpOffline } from '@/lib/idb'
+import { syncQueue, upsertXp } from '@/lib/sync'
+import { loadJenisOfflineFirst } from '@/lib/jenis'
 
 function fmtInput(val: string) {
   return val.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.')
@@ -41,17 +42,7 @@ export default function BatchInputForm({ onSuccess }: { onSuccess: (count: numbe
   const nominalRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    async function load() {
-      try {
-        const { data, error } = await supabase.from('jenis_pengeluaran').select('*').order('nama')
-        if (data && !error) { setJenisList(data); await saveJenisOffline(data) }
-        else throw new Error()
-      } catch {
-        const cached = await getJenisOffline()
-        if (cached.length) setJenisList(cached)
-      }
-    }
-    load()
+    loadJenisOfflineFirst(setJenisList)
   }, [])
 
   useEffect(() => {
@@ -139,7 +130,13 @@ export default function BatchInputForm({ onSuccess }: { onSuccess: (count: numbe
     }
     await syncQueue()
 
-    // XP: +10 per entry
+    // XP: +10 per entry, per the actual creator
+    const currentXp = await getXpOffline(createdBy)
+    const newXp = currentXp + rows.length * 10
+    await saveXpOffline(createdBy, newXp)
+    if (navigator.onLine) upsertXp(createdBy, newXp).catch(() => {})
+
+    // legacy localStorage streak for display
     const streak = parseInt(localStorage.getItem('input-streak') || '0')
     localStorage.setItem('input-streak', String(streak + rows.length))
 

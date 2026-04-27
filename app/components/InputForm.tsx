@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase, JenisPengeluaran } from '@/lib/supabase'
-import { saveJenisOffline, getJenisOffline, savePengeluaranOffline } from '@/lib/idb'
-import { syncQueue } from '@/lib/sync'
+import { saveJenisOffline, getJenisOffline, savePengeluaranOffline, saveXpOffline, getXpOffline } from '@/lib/idb'
+import { syncQueue, upsertXp } from '@/lib/sync'
+import { loadJenisOfflineFirst } from '@/lib/jenis'
 
 type Step = 'who' | 'jenis' | 'nominal' | 'keterangan' | 'confirm'
 
@@ -26,17 +27,7 @@ export default function InputForm({ onSuccess }: { onSuccess: () => void }) {
 
   useEffect(() => {
     setStreak(parseInt(localStorage.getItem('input-streak') || '0'))
-    async function loadJenis() {
-      try {
-        const { data, error } = await supabase.from('jenis_pengeluaran').select('*').order('nama')
-        if (data && !error) { setJenisList(data); await saveJenisOffline(data) }
-        else throw new Error()
-      } catch {
-        const cached = await getJenisOffline()
-        if (cached.length > 0) setJenisList(cached)
-      }
-    }
-    loadJenis()
+    loadJenisOfflineFirst(setJenisList)
   }, [])
 
   useEffect(() => {
@@ -65,6 +56,11 @@ export default function InputForm({ onSuccess }: { onSuccess: () => void }) {
     const newStreak = streak + 1
     setStreak(newStreak)
     localStorage.setItem('input-streak', String(newStreak))
+    // Sync XP — load current from IDB, add 10, save + push to Supabase
+    const currentXp = await getXpOffline(createdBy)
+    const newXp = currentXp + 10
+    await saveXpOffline(createdBy, newXp)
+    if (navigator.onLine) upsertXp(createdBy, newXp).catch(() => {})
     setXpAnim(true); setConfetti(true)
     setTimeout(() => setXpAnim(false), 1500)
     setTimeout(() => setConfetti(false), 2500)

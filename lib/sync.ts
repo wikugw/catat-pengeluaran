@@ -71,6 +71,20 @@ export async function deleteBudget(jenis_nama: string) {
   return !error
 }
 
+// ── XP sync ──────────────────────────────────────────────────────────────
+export async function fetchAllXp(): Promise<{ user_name: string; xp: number }[] | null> {
+  const { data, error } = await supabase.from('user_xp').select('user_name, xp')
+  if (error) return null
+  return data
+}
+
+export async function upsertXp(user_name: string, xp: number) {
+  const { error } = await supabase
+    .from('user_xp')
+    .upsert({ user_name, xp, updated_at: new Date().toISOString() }, { onConflict: 'user_name' })
+  return !error
+}
+
 export async function upsertBudget(jenis_nama: string, monthly_limit: number) {
   const { error } = await supabase
     .from('budgets')

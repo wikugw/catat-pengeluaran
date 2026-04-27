@@ -2,7 +2,9 @@
 
 import { ACHIEVEMENTS, LEVELS, getLevelFromXp, Pengeluaran } from '@/lib/supabase'
 
-export default function AchievementsPanel({ xp, data }: { xp: number; data: Pengeluaran[] }) {
+export default function AchievementsPanel({ xp, allXp, data }: { xp: number; allXp: Record<string, number>; data: Pengeluaran[] }) {
+  const wikulevel = getLevelFromXp(allXp.wiku ?? 0)
+  const ditalevel = getLevelFromXp(allXp.dita ?? 0)
   const level = getLevelFromXp(xp)
   const nextLevel = LEVELS.find(l => l.level === level.level + 1)
   const progress = nextLevel ? ((xp - level.minXp) / (level.maxXp - level.minXp)) * 100 : 100
@@ -33,6 +35,30 @@ export default function AchievementsPanel({ xp, data }: { xp: number; data: Peng
             <span>{level.maxXp} XP → {nextLevel.icon} {nextLevel.title}</span>
           </div>
         )}
+      </div>
+
+      {/* Leaderboard — Wiku vs Dita */}
+      <div className="rounded-2xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+        <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--text-3)' }}>🏆 Leaderboard</div>
+        {[{ name: 'wiku', emoji: '🧔', lv: wikulevel, xpVal: allXp.wiku ?? 0 },
+          { name: 'dita', emoji: '👩', lv: ditalevel, xpVal: allXp.dita ?? 0 }]
+          .sort((a, b) => b.xpVal - a.xpVal)
+          .map((u, i) => (
+            <div key={u.name} className={`flex items-center gap-3 p-3 rounded-xl mb-2 last:mb-0 border ${
+              i === 0 ? 'border-yellow-400/40 bg-yellow-50 dark:bg-yellow-900/20' : ''
+            }`} style={i !== 0 ? { borderColor: 'var(--border)', background: 'var(--bg-input)' } : {}}>
+              <span className="text-lg">{i === 0 ? '🥇' : '🥈'}</span>
+              <span className="text-2xl">{u.emoji}</span>
+              <div className="flex-1">
+                <div className="text-sm font-bold capitalize" style={{ color: 'var(--text)' }}>{u.name}</div>
+                <div className="text-xs" style={{ color: 'var(--text-3)' }}>{u.lv.icon} {u.lv.title}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-base font-black text-indigo-500 dark:text-indigo-300">{u.xpVal} XP</div>
+                <div className="text-xs" style={{ color: 'var(--text-3)' }}>Lv.{u.lv.level}</div>
+              </div>
+            </div>
+          ))}
       </div>
 
       {/* Unlocked */}
