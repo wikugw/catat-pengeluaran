@@ -1,6 +1,7 @@
 'use client'
 
 import { Pengeluaran, Budget } from '@/lib/supabase'
+import { exportToExcel } from '@/lib/export'
 
 function fmt(n: number) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
@@ -21,10 +22,19 @@ type Props = {
 }
 
 export default function Dashboard({ data, budgets, loading, year, month, onOpenBudget }: Props) {
+  const monthName = new Date(year, month).toLocaleString('id-ID', { month: 'long', year: 'numeric' })
+
+  async function handleExport() {
+    if (data.length === 0) return
+    await exportToExcel(data, year, month)
+  }
+
   if (loading) {
     return (
       <div className="space-y-3">
-        {[1,2,3,4].map(i => <div key={i} className="h-20 rounded-2xl animate-pulse" style={{ background: 'var(--bg-card)' }} />)}
+        {[1,2,3,4].map(i => (
+          <div key={i} className="h-20 rounded-2xl animate-pulse" style={{ background: 'var(--bg-card)' }} />
+        ))}
       </div>
     )
   }
@@ -54,16 +64,32 @@ export default function Dashboard({ data, budgets, loading, year, month, onOpenB
   const budgetMap: Record<string, number> = {}
   for (const b of budgets) budgetMap[b.jenis_nama] = b.monthly_limit
 
-  const monthName = new Date(year, month).toLocaleString('id-ID', { month: 'long', year: 'numeric' })
-
   return (
     <div className="space-y-4">
-      {/* Total card */}
+
+      {/* ── Total card ── */}
       <div className="rounded-2xl p-5 bg-gradient-to-br from-indigo-600 to-purple-600 text-white">
-        <div className="text-xs font-semibold uppercase tracking-widest opacity-80 mb-1">Total {monthName}</div>
-        <div className="text-3xl font-black">{fmt(total)}</div>
-        <div className="mt-3 space-y-1.5">
-          {[{ label: '🧔 Wiku', val: wiku, color: 'bg-white/60' }, { label: '👩 Dita', val: dita, color: 'bg-white/40' }].map(({ label, val, color }) => (
+        <div className="flex items-start justify-between mb-1">
+          <div className="text-xs font-semibold uppercase tracking-widest opacity-80">
+            Total {monthName}
+          </div>
+          {/* Export button — lives inside the card, top right */}
+          <button
+            onClick={handleExport}
+            disabled={data.length === 0}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold
+              bg-white/20 hover:bg-white/30 active:scale-95 disabled:opacity-40
+              transition-all border border-white/20"
+          >
+            📥 Export Excel
+          </button>
+        </div>
+        <div className="text-3xl font-black mb-3">{fmt(total)}</div>
+        <div className="space-y-1.5">
+          {[
+            { label: '🧔 Wiku', val: wiku, color: 'bg-white/60' },
+            { label: '👩 Dita', val: dita, color: 'bg-white/40' },
+          ].map(({ label, val, color }) => (
             <div key={label} className="flex items-center gap-2">
               <span className="text-xs w-14 opacity-90">{label}</span>
               <div className="flex-1 h-2 bg-white/20 rounded-full overflow-hidden">
@@ -76,73 +102,103 @@ export default function Dashboard({ data, budgets, loading, year, month, onOpenB
         </div>
       </div>
 
-      {/* Weekly chart */}
+      {/* ── Weekly chart ── */}
       {data.length > 0 && (
         <div className="rounded-2xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--text-3)' }}>Minggu ini</div>
+          <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--text-3)' }}>
+            Per Minggu
+          </div>
           <div className="flex items-end gap-2 h-20">
             {weeks.map((w, i) => (
               <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                <div className="text-[10px]" style={{ color: 'var(--text-3)' }}>{w > 0 ? fmtShort(w) : ''}</div>
-                <div className="w-full rounded-t-lg transition-all duration-700"
+                <div className="text-[10px]" style={{ color: 'var(--text-3)' }}>
+                  {w > 0 ? fmtShort(w) : ''}
+                </div>
+                <div
+                  className="w-full rounded-t-lg transition-all duration-700"
                   style={{
                     height: `${Math.max((w / maxWeek) * 56, w > 0 ? 6 : 0)}px`,
                     background: i === currentWeek ? '#6366f1' : 'var(--border)',
-                  }} />
-                <div className="text-[10px] font-semibold"
-                  style={{ color: i === currentWeek ? '#6366f1' : 'var(--text-3)' }}>W{i+1}</div>
+                  }}
+                />
+                <div
+                  className="text-[10px] font-semibold"
+                  style={{ color: i === currentWeek ? '#6366f1' : 'var(--text-3)' }}
+                >
+                  W{i + 1}
+                </div>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Categories */}
+      {/* ── Categories + budget ── */}
       <div className="rounded-2xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
         <div className="flex items-center justify-between mb-3">
-          <div className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-3)' }}>Kategori</div>
-          <button onClick={onOpenBudget}
-            className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:opacity-80 transition-opacity">
+          <div className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-3)' }}>
+            Kategori
+          </div>
+          <button
+            onClick={onOpenBudget}
+            className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:opacity-80 transition-opacity"
+          >
             ⚙ Set Budget
           </button>
         </div>
-        {sortedJenis.length === 0
-          ? <div className="text-center text-sm py-4" style={{ color: 'var(--text-3)' }}>Belum ada data</div>
-          : <div className="space-y-3">
-              {sortedJenis.map(j => {
-                const budget = budgetMap[j.nama]
-                const pct = budget ? Math.min((j.total / budget) * 100, 100) : (j.total / maxJenis) * 100
-                const over  = budget && j.total > budget
-                const near  = budget && j.total > budget * 0.8 && !over
-                const barBg = over ? '#ef4444' : near ? '#f59e0b' : '#6366f1'
-                return (
-                  <div key={j.nama}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span style={{ color: 'var(--text-2)' }}>{j.nama}</span>
-                      <div className="text-right">
-                        <span className="font-semibold" style={{ color: over ? '#ef4444' : near ? '#f59e0b' : 'var(--text)' }}>
-                          {fmtShort(j.total)}
+
+        {sortedJenis.length === 0 ? (
+          <div className="text-center text-sm py-4" style={{ color: 'var(--text-3)' }}>Belum ada data</div>
+        ) : (
+          <div className="space-y-3">
+            {sortedJenis.map(j => {
+              const budget = budgetMap[j.nama]
+              const pct    = budget
+                ? Math.min((j.total / budget) * 100, 100)
+                : (j.total / maxJenis) * 100
+              const over = budget && j.total > budget
+              const near = budget && j.total > budget * 0.8 && !over
+              const barBg = over ? '#ef4444' : near ? '#f59e0b' : '#6366f1'
+
+              return (
+                <div key={j.nama}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span style={{ color: 'var(--text-2)' }}>{j.nama}</span>
+                    <div className="text-right">
+                      <span className="font-semibold" style={{ color: over ? '#ef4444' : near ? '#f59e0b' : 'var(--text)' }}>
+                        {fmtShort(j.total)}
+                      </span>
+                      {budget && (
+                        <span className="text-xs ml-1" style={{ color: 'var(--text-3)' }}>
+                          / {fmtShort(budget)}
                         </span>
-                        {budget && <span className="text-xs ml-1" style={{ color: 'var(--text-3)' }}>/ {fmtShort(budget)}</span>}
-                      </div>
+                      )}
                     </div>
-                    <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
-                      <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: barBg }} />
-                    </div>
-                    {over && <div className="text-[10px] text-red-500 mt-0.5 text-right">⚠ +{fmtShort(j.total - budget)} over budget</div>}
                   </div>
-                )
-              })}
-            </div>
-        }
+                  <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{ width: `${pct}%`, background: barBg }}
+                    />
+                  </div>
+                  {over && (
+                    <div className="text-[10px] text-red-500 mt-0.5 text-right">
+                      ⚠ +{fmtShort(j.total - budget)} over budget
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Stats */}
+      {/* ── Stats row ── */}
       <div className="grid grid-cols-3 gap-2">
         {[
           { label: 'Transaksi', val: String(data.length) },
-          { label: 'Rata-rata', val: data.length > 0 ? fmtShort(Math.round(total / data.length)) : '-' },
-          { label: 'Kategori', val: String(Object.keys(byJenis).length) },
+          { label: 'Rata-rata',  val: data.length > 0 ? fmtShort(Math.round(total / data.length)) : '-' },
+          { label: 'Kategori',   val: String(Object.keys(byJenis).length) },
         ].map(({ label, val }) => (
           <div key={label} className="rounded-2xl border p-3" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
             <div className="text-xs mb-1" style={{ color: 'var(--text-3)' }}>{label}</div>
@@ -150,6 +206,7 @@ export default function Dashboard({ data, budgets, loading, year, month, onOpenB
           </div>
         ))}
       </div>
+
     </div>
   )
 }

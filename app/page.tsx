@@ -233,6 +233,7 @@ export default function Home() {
         )}
         {tab === 'riwayat' && (
           <PengeluaranTable data={data} jenisList={jenisList} loading={loading}
+            year={viewYear} month={viewMonth}
             onRefresh={() => loadData(viewYear, viewMonth)} />
         )}
         {tab === 'achievements' && <AchievementsPanel xp={xp} allXp={allXp} data={data} />}
