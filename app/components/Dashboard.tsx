@@ -2,6 +2,7 @@
 
 import { Pengeluaran, Budget } from '@/lib/supabase'
 import { exportToExcel } from '@/lib/export'
+import MonthlyNote from './MonthlyNote'
 
 function fmt(n: number) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
@@ -102,6 +103,9 @@ export default function Dashboard({ data, budgets, loading, year, month, onOpenB
         </div>
       </div>
 
+      {/* ── Monthly note ── */}
+      <MonthlyNote year={year} month={month} />
+
       {/* ── Weekly chart ── */}
       {data.length > 0 && (
         <div className="rounded-2xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
@@ -195,16 +199,26 @@ export default function Dashboard({ data, budgets, loading, year, month, onOpenB
 
       {/* ── Stats row ── */}
       <div className="grid grid-cols-3 gap-2">
-        {[
-          { label: 'Transaksi', val: String(data.length) },
-          { label: 'Rata-rata',  val: data.length > 0 ? fmtShort(Math.round(total / data.length)) : '-' },
-          { label: 'Kategori',   val: String(Object.keys(byJenis).length) },
-        ].map(({ label, val }) => (
-          <div key={label} className="rounded-2xl border p-3" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            <div className="text-xs mb-1" style={{ color: 'var(--text-3)' }}>{label}</div>
-            <div className="text-xl font-black">{val}</div>
-          </div>
-        ))}
+        {(() => {
+          // Days elapsed this month (or full month if viewing past month)
+          const now = new Date()
+          const isCurrentMonth = now.getFullYear() === year && now.getMonth() === month
+          const daysElapsed = isCurrentMonth
+            ? now.getDate()
+            : new Date(year, month + 1, 0).getDate() // last day of that month
+          const avgPerDay = daysElapsed > 0 ? Math.round(total / daysElapsed) : 0
+
+          return [
+            { label: 'Transaksi',    val: String(data.length) },
+            { label: `Rata-rata/hari (${daysElapsed}hr)`, val: data.length > 0 ? fmtShort(avgPerDay) : '-' },
+            { label: 'Kategori',     val: String(Object.keys(byJenis).length) },
+          ].map(({ label, val }) => (
+            <div key={label} className="rounded-2xl border p-3" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+              <div className="text-xs mb-1 leading-tight" style={{ color: 'var(--text-3)' }}>{label}</div>
+              <div className="text-xl font-black">{val}</div>
+            </div>
+          ))
+        })()}
       </div>
 
     </div>

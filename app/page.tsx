@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import InputForm from './components/InputForm'
 import BatchInputForm from './components/BatchInputForm'
+import QuickRepeat from './components/QuickRepeat'
 import Dashboard from './components/Dashboard'
 import PengeluaranTable from './components/PengeluaranTable'
 import AchievementsPanel from './components/AchievementsPanel'
@@ -200,6 +201,10 @@ export default function Home() {
       <main className="flex-1 px-5 pb-32 overflow-y-auto">
         {tab === 'input' && (
           <div className="space-y-4">
+            {/* Quick input shortcuts */}
+            {inputMode === 'single' && (
+              <QuickRepeat jenisList={jenisList} onSuccess={handleSuccess} />
+            )}
             {/* Mode toggle */}
             <div className="flex rounded-2xl border p-1 gap-1" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
               <button

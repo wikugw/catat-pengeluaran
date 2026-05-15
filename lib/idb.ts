@@ -1,12 +1,13 @@
 import { Pengeluaran, PengeluaranInsert } from './supabase'
 
 const DB_NAME = 'catat-pengeluaran'
-const DB_VERSION = 3
+const DB_VERSION = 4
 const STORE_PENGELUARAN = 'pengeluaran'
 const STORE_JENIS = 'jenis_pengeluaran'
 const STORE_QUEUE = 'sync_queue'
 const STORE_BUDGETS = 'budgets'
 const STORE_XP = 'user_xp'
+const STORE_NOTES = 'monthly_notes'
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -31,6 +32,9 @@ function openDB(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORE_XP)) {
         db.createObjectStore(STORE_XP, { keyPath: 'user_name' })
+      }
+      if (!db.objectStoreNames.contains(STORE_NOTES)) {
+        db.createObjectStore(STORE_NOTES, { keyPath: 'id' })
       }
     }
 
@@ -221,6 +225,31 @@ export async function getAllXpOffline(): Promise<{ user_name: string; xp: number
     const tx = db.transaction(STORE_XP, 'readonly')
     const req = tx.objectStore(STORE_XP).getAll()
     req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error)
+  })
+}
+
+// ── Monthly notes ──────────────────────────────────────────────────────
+export function noteKey(year: number, month: number) {
+  return `${year}-${String(month + 1).padStart(2, '0')}`
+}
+
+export async function saveNoteOffline(year: number, month: number, note: string) {
+  const db = await openDB()
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE_NOTES, 'readwrite')
+    tx.objectStore(STORE_NOTES).put({ id: noteKey(year, month), note })
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
+export async function getNoteOffline(year: number, month: number): Promise<string> {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NOTES, 'readonly')
+    const req = tx.objectStore(STORE_NOTES).get(noteKey(year, month))
+    req.onsuccess = () => resolve(req.result?.note ?? '')
     req.onerror = () => reject(req.error)
   })
 }

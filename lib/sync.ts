@@ -91,3 +91,23 @@ export async function upsertBudget(jenis_nama: string, monthly_limit: number) {
     .upsert({ jenis_nama, monthly_limit, updated_at: new Date().toISOString() }, { onConflict: 'jenis_nama' })
   return !error
 }
+
+// ── Monthly notes ──────────────────────────────────────────────────────────
+export async function fetchNote(year: number, month: number): Promise<string | null> {
+  const id = `${year}-${String(month + 1).padStart(2, '0')}`
+  const { data, error } = await supabase
+    .from('monthly_notes')
+    .select('note')
+    .eq('id', id)
+    .single()
+  if (error) return null
+  return data?.note ?? ''
+}
+
+export async function upsertNote(year: number, month: number, note: string) {
+  const id = `${year}-${String(month + 1).padStart(2, '0')}`
+  const { error } = await supabase
+    .from('monthly_notes')
+    .upsert({ id, note, updated_at: new Date().toISOString() }, { onConflict: 'id' })
+  return !error
+}
