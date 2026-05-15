@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { saveJenisOffline, getJenisOffline, savePengeluaranOffline, saveXpOffline, getXpOffline } from '@/lib/idb'
 import { syncQueue, upsertXp } from '@/lib/sync'
 import { loadJenisOfflineFirst } from '@/lib/jenis'
+import JenisPicker from './JenisPicker'
 
 function fmtInput(val: string) {
   return val.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.')
@@ -316,17 +317,13 @@ export default function BatchInputForm({ onSuccess }: { onSuccess: (count: numbe
             {/* Sheet content */}
             <div className="flex-1 overflow-y-auto px-5 pb-8">
               {sheetStep === 'jenis' && (
-                <div className="grid grid-cols-3 gap-3 pb-4">
-                  {jenisList.map(j => (
-                    <button key={j.id} onClick={() => handleSheetSelectJenis(j)}
-                      className={`flex flex-col items-center gap-2 py-4 px-2 rounded-2xl border-2 active:scale-95 transition-all ${
-                        sheetJenis?.id === j.id ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30' : ''
-                      }`}
-                      style={sheetJenis?.id !== j.id ? { background: 'var(--bg-input)', borderColor: 'var(--border)' } : {}}>
-                      <span className="text-3xl">{j.icon}</span>
-                      <span className="text-xs font-semibold text-center leading-tight" style={{ color: 'var(--text-2)' }}>{j.nama}</span>
-                    </button>
-                  ))}
+                <div className="pb-4">
+                  <JenisPicker
+                    jenisList={jenisList}
+                    selected={sheetJenis}
+                    onSelect={handleSheetSelectJenis}
+                    accentColor="purple"
+                  />
                 </div>
               )}
 

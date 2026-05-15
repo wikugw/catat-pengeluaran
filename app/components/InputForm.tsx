@@ -5,6 +5,7 @@ import { supabase, JenisPengeluaran } from '@/lib/supabase'
 import { saveJenisOffline, getJenisOffline, savePengeluaranOffline, saveXpOffline, getXpOffline } from '@/lib/idb'
 import { syncQueue, upsertXp } from '@/lib/sync'
 import { loadJenisOfflineFirst } from '@/lib/jenis'
+import JenisPicker from './JenisPicker'
 
 type Step = 'who' | 'jenis' | 'nominal' | 'keterangan' | 'confirm'
 
@@ -125,20 +126,15 @@ export default function InputForm({ onSuccess }: { onSuccess: () => void }) {
 
       {/* ── Step: Jenis ── */}
       {step === 'jenis' && (
-        <div>
-          <div className="grid grid-cols-3 gap-3">
-            {jenisList.map(j => (
-              <button key={j.id}
-                onClick={() => { setSelectedJenis(j); setStep('nominal') }}
-                className="flex flex-col items-center gap-2 py-4 px-2 rounded-2xl border-2 hover:border-indigo-500 active:scale-95 transition-all"
-                style={{ background: 'var(--bg-input)', borderColor: 'var(--border)' }}>
-                <span className="text-3xl">{j.icon}</span>
-                <span className="text-xs font-semibold text-center leading-tight" style={{ color: 'var(--text-2)' }}>{j.nama}</span>
-              </button>
-            ))}
-          </div>
+        <div className="space-y-4">
+          <JenisPicker
+            jenisList={jenisList}
+            selected={selectedJenis}
+            onSelect={j => { setSelectedJenis(j); setStep('nominal') }}
+            accentColor="indigo"
+          />
           <button onClick={() => setStep('who')}
-            className="mt-5 w-full py-3 rounded-xl text-base font-semibold border transition-colors active:scale-[0.98]"
+            className="w-full py-3 rounded-xl text-base font-semibold border transition-colors active:scale-[0.98]"
             style={{ background: 'var(--bg-input)', borderColor: 'var(--border)', color: 'var(--text-2)' }}>
             ← Ganti siapa
           </button>
